@@ -39,7 +39,7 @@ Standard library only, no network, and the same bytes on every run.
 
 ## Drawing the picture again
 
-`art/gen.mjs` writes `art/art.html`, and a browser renders it:
+`art/gen.mjs` writes `art/art.html` from `art/draw.js`, and a browser renders it:
 
 ```
 cd art
@@ -47,15 +47,46 @@ node gen.mjs
 ~/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome \
   --headless=new --disable-gpu --no-sandbox --hide-scrollbars \
   --force-device-scale-factor=1 --window-size=1024,1024 \
-  --screenshot=../entry.png "file://$PWD/art.html"
+  --screenshot=out.png "file://$PWD/art.html"
 ```
 
 The generator is deterministic: a fixed-seed PRNG, no clock and no `Math.random`, so
-the same source always draws the same picture. It is a drawing rather than a
-photograph — every highlight, shadow and texture in it is a gradient, a filter or a
-path, built up in layers: the room out of focus behind the bowl, the bowl and its rim,
-the broth and what it mirrors, the nori, the noodles, the pork, the egg, the scatter on
-the surface, and the steam and key light on top of it all.
+the same source always draws the same picture, offline and with nothing but the
+standard library.
+
+## The picture that is entered, and the one that is not
+
+`entry.png` is still the picture entered at commit `a95af8a`: a bowl drawn by the
+earlier, flat-vector generator. It is untouched, so the entry standing on the site
+still matches the bytes in this repository.
+
+`art/` now draws a **different, newer** picture. It is painted on a canvas rather than
+composed in SVG, and it reworks the five things the old one did worst — the egg, the
+noodles, the broth, the pork and the steam — so that the food reads as food rather
+than as a flat illustration:
+
+- **the egg**: an elongated, slightly lobed white with a warm tinge at its edge, and a
+  jammy yolk set into a cavity in it, off centre, its highlight spread wide and soft
+  instead of a hard white dot;
+- **the noodles**: ribbons whose half-width varies along their length, each shaded
+  across its own axis with a narrow glint on top and a core shadow under it, some
+  under the broth and some above it;
+- **the broth**: amber shoyu with the room's window mirrored in it and cut into
+  ripples, a meniscus climbing the wall, oil droplets and bubbles;
+- **the pork**: braised belly with seared, blotchy edges and fat and lean in bands that
+  bend and break up rather than running clean edge to edge;
+- **the steam**: soft low-opacity plumes, tapered at both ends and blurred by degrees,
+  with no edge anywhere.
+
+It also adds the things that separate a photograph from a drawing and that the old one
+had none of: a focal plane, so the room is soft and the food is crisp; a lighting model
+that gives every wet surface a specular; a tight contact shadow under every piece of
+food, so nothing floats; and film grain over the whole frame.
+
+It has **not been submitted**. Measured against the picture standing as the entry it is
+more realistic and cleaner, but it is also busier and reads less clearly at thumbnail
+size, and the two things roughly cancel — so `entry.png` was left alone on purpose. To
+ship it, render it over `entry.png` with the command above and enter a new commit.
 
 ## License
 
