@@ -49,12 +49,17 @@ function checkPng(buf) {
   if (buf.length < 8 || !buf.subarray(0, 8).equals(PNG_SIGNATURE)) refuse('bad PNG signature');
 
   // bit depth by colour type, as the format allows
-  const LEGAL_DEPTHS = { 0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16] };
+  const LEGAL_DEPTHS: Record<number, number[]> = { 0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16] };
+  // the chunks a renderer must understand; anything else critical cannot be
+  // drawn by a reader that does not know it, so it is not a picture we can enter
+  const KNOWN_CRITICAL = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND']);
 
   let at = 8;
   let width = 0;
   let height = 0;
+  let colourType = -1;
   let sawHeader = false;
+  let sawPalette = false;
   let sawData = false;
   let sawEnd = false;
 
@@ -70,6 +75,11 @@ function checkPng(buf) {
     const actual = crc32(buf.subarray(at + 4, at + 8 + length));
     if (stated !== actual) refuse(`PNG chunk ${type} fails its checksum`);
 
+    // an uppercase first letter marks a chunk a reader may not skip
+    if (type[0] === type[0].toUpperCase() && !KNOWN_CRITICAL.has(type)) {
+      refuse(`the PNG carries a critical chunk ${type} this reader cannot draw`);
+    }
+
     if (type === 'IHDR') {
       if (sawHeader) refuse('the PNG carries a second IHDR');
       if (at !== 8) refuse('IHDR is not the first PNG chunk');
@@ -78,7 +88,7 @@ function checkPng(buf) {
       height = buf.readUInt32BE(at + 12);
       if (width < 1 || height < 1) refuse('IHDR names no pixels');
       const bitDepth = buf[at + 16];
-      const colourType = buf[at + 17];
+      colourType = buf[at + 17];
       if (!LEGAL_DEPTHS[colourType]) refuse(`IHDR names an illegal colour type (${colourType})`);
       if (!LEGAL_DEPTHS[colourType].includes(bitDepth)) {
         refuse(`IHDR names bit depth ${bitDepth} with colour type ${colourType}, which the format forbids`);
@@ -86,7 +96,14 @@ function checkPng(buf) {
       if (buf[at + 18] !== 0 || buf[at + 19] !== 0) refuse('IHDR names an unknown compression or filter method');
       if (buf[at + 20] > 1) refuse('IHDR names an unknown interlace method');
       sawHeader = true;
+    } else if (type === 'PLTE') {
+      if (!sawHeader) refuse('the PNG carries a palette before its header');
+      if (sawData) refuse('the PNG carries a palette after its image data');
+      if (length === 0 || length % 3 !== 0) refuse('PLTE is not a whole number of colour entries');
+      if (length > 768) refuse('PLTE carries more entries than the format allows');
+      sawPalette = true;
     } else if (type === 'IDAT') {
+      if (colourType === 3 && !sawPalette) refuse('an indexed PNG carries no palette');
       sawData = true;
     } else if (type === 'IEND') {
       if (!sawHeader) refuse('the PNG reaches IEND with no header');
